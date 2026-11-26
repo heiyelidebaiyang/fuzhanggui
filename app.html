@@ -267,7 +267,7 @@ var TABLES = ["A01","A02","A03","A04","A05","A06","A07","A08","A09","A10","A11",
 (function(){
   var KEY = 'fzg_pos_orders_v1', CFG_KEY = 'fzg_gh_cfg', SEQ_KEY = 'fzg_pos_seq', BASE_NO = 7238004500;
   var CART = {}, catFilter = '全部', kw = '', scope = 'today';
-  var ORDERS = [], MODE = 'local', LAST_SYNC = '';
+  var ORDERS = [], MODE = 'local', LAST_SYNC = '', LAST_PEND = 0;
   var IDX = {};
   GOODS.forEach(function(g){ IDX[g.n] = g; });
 
@@ -290,7 +290,7 @@ var TABLES = ["A01","A02","A03","A04","A05","A06","A07","A08","A09","A10","A11",
     MODE = m;
     var tag = document.getElementById('netTag'), tx = document.getElementById('netText');
     tag.classList.remove('off','cloud');
-    if (m === 'api'){ tx.textContent = '收银服务'; }
+    if (m === 'api'){ tx.textContent = '收银服务' + (LAST_PEND ? '·待传' + LAST_PEND : ''); }
     else if (m === 'cloud'){ tag.classList.add('cloud'); tx.textContent = '云端'; }
     else { tag.classList.add('off'); tx.textContent = '本机'; }
   }
@@ -300,7 +300,7 @@ var TABLES = ["A01","A02","A03","A04","A05","A06","A07","A08","A09","A10","A11",
       var r = await fetch('./api/orders?_=' + Date.now(), {cache:'no-store'});
       if (r.ok) {
         var j = await r.json();
-        if (j && Array.isArray(j.orders)) { setMode('api'); LAST_SYNC = j.updated || ''; return j.orders; }
+        if (j && Array.isArray(j.orders)) { LAST_PEND = j.pending || 0; setMode('api'); LAST_SYNC = j.updated || ''; return j.orders; }
       }
     } catch(e){}
     try {
@@ -317,9 +317,14 @@ var TABLES = ["A01","A02","A03","A04","A05","A06","A07","A08","A09","A10","A11",
   async function pushOrder(o){
     try {
       var r = await fetch('./api/orders', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({order:o})});
-      if (r.ok){ setMode('api'); return 'api'; }
+      if (r.ok){
+        var j = await r.json();
+        LAST_PEND = j.pending || 0;
+        setMode('api');
+        return {via:'api', pushed: !!j.pushed, pending: LAST_PEND};
+      }
     } catch(e){}
-    return 'local';
+    return {via:'local'};
   }
 
   async function refresh(full){
@@ -403,13 +408,13 @@ var TABLES = ["A01","A02","A03","A04","A05","A06","A07","A08","A09","A10","A11",
     var o = {no: nextNo(), time: nowStr(), table: table, pax: pax, items: items, amount: +total.toFixed(2), state: '03'};
     var via = await pushOrder(o);
     ORDERS.unshift(o);
-    if (via !== 'api') {
+    if (via.via !== 'api') {
       saveLocal(ORDERS);
       var cfg = getCfg();
-      if (cfg && cfg.token) { var ok = await pushCloud(); toast(ok ? ('已开单 ' + o.no + '，并上传云端') : ('已开单 ' + o.no + '，本机保存')); }
-      else { toast('已开单 ' + o.no + '，数据存本机（点「同步」可传到 GitHub）'); }
+      if (cfg && cfg.token) { var ok = await pushCloud(); toast(ok ? ('已开单 ' + o.no + '，已直推 GitHub') : ('已开单 ' + o.no + '，本机保存')); }
+      else { toast('已开单 ' + o.no + '，存本机；配了监听或 token 后会自动上传'); }
     } else {
-      toast('已开单 ' + o.no + '，已写入收银服务');
+      toast('已开单 ' + o.no + (via.pushed ? '，本地与 GitHub 已同时写入' : ('，本地已存，' + (via.pending || 1) + ' 笔待自动补传')));
     }
     CART = {};
     closeSheet(); renderDishes(); updateBar(); renderList(); renderStat();

@@ -237,12 +237,12 @@ var META = {"shop":"商河县李家大院饭店1","term":"35385391","acct":"mxa7
   }
 
   /* ---------- 数据源：收银服务优先 → 云端 json → 本机 ---------- */
-  var SRC = 'local';
+  var SRC = 'local', LAST_PEND = 0;
   function setSrc(m){
     SRC = m;
     var box = document.getElementById('cnet');
     box.classList.remove('cloud', 'off');
-    if (m === 'api') { document.getElementById('cnetText').textContent = '收银服务'; }
+    if (m === 'api') { document.getElementById('cnetText').textContent = '收银服务' + (LAST_PEND ? '·待传' + LAST_PEND : ''); }
     else if (m === 'cloud') { box.classList.add('cloud'); document.getElementById('cnetText').textContent = '云端'; }
     else { box.classList.add('off'); document.getElementById('cnetText').textContent = '本机'; }
   }
@@ -251,7 +251,7 @@ var META = {"shop":"商河县李家大院饭店1","term":"35385391","acct":"mxa7
       var r = await fetch('./api/orders?_=' + Date.now(), {cache: 'no-store'});
       if (r.ok) {
         var j = await r.json();
-        if (j && Array.isArray(j.orders)) { setSrc('api'); return {mode: 'api', orders: j.orders}; }
+        if (j && Array.isArray(j.orders)) { LAST_PEND = j.pending || 0; setSrc('api'); return {mode: 'api', orders: j.orders}; }
       }
     } catch (e) {}
     try {
@@ -466,11 +466,12 @@ var META = {"shop":"商河县李家大院饭店1","term":"35385391","acct":"mxa7
         var j = await r.json();
         setSrc('api');
         toast('已开单 ' + no + ' · ' + money(total) +
-              (j.pushed ? '，并已推送云端' : '，已写入收银服务（云端未配 token）'));
+              (j.pushed ? '，本地与 GitHub 已同时写入'
+                        : ('，本地已存，' + (j.pending || 1) + ' 笔待监听自动补传')));
         return;
       }
     } catch (e) {}
-    toast('已开单 ' + no + ' · ' + money(total) + '，暂存本机，点「同步云端」可补传');
+    toast('已开单 ' + no + ' · ' + money(total) + '，暂存本机，重启监听后自动补传');
   }
 
   /* ---------- 导出 ---------- */
