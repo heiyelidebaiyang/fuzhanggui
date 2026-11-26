@@ -1,0 +1,25 @@
+{
+ "shop": "商河县李家大院饭店1",
+ "updated": "2026-11-26 16:00:23",
+ "orders": [
+  {
+   "no": "7295746613",
+   "time": "2026-11-26 14:28:27",
+   "table": "取餐码1",
+   "pax": 1,
+   "items": [],
+   "itemsText": "",
+   "amount": 56,
+   "state": "03",
+   "src": "sp-backstage",
+   "shop": "商河县李家大院饭店1",
+   "payType": "现金",
+   "tradeNo": "SAAS36848233202611261428270831",
+   "status": "已接单待配送",
+   "channel": "收银机",
+   "cashier": "mxa733175/mxa****",
+   "note": "商户后台同步 · 现金 · 已接单待配送"
+  }
+ ],
+ "pending": []
+}
