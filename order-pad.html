@@ -21,6 +21,10 @@ button{font-family:inherit}
 .brand .suby{font-weight:400;font-size:11.5px;color:#B7AC9E;margin-top:1px}
 .sp{flex:1}
 .clock{font-family:var(--num);font-size:15px;color:#F2EDE5;letter-spacing:.04em}
+.cnet{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#BFB3A5;border:1px dashed #4A433B;border-radius:3px;padding:4px 8px;white-space:nowrap}
+.cnet i{width:7px;height:7px;border-radius:50%;background:#4C8A63;display:inline-block}
+.cnet.cloud i{background:#4A82C4}
+.cnet.off i{background:#C0703F}
 .clock small{font-size:11px;color:#A99E90;margin-left:6px;letter-spacing:0}
 .tbtn{border:1px solid #4A433B;background:#2C2723;color:#EFE8DD;height:32px;padding:0 12px;border-radius:3px;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .tbtn:hover{background:#3A332C;border-color:#5C5449}
@@ -139,6 +143,8 @@ button{font-family:inherit}
     </div>
     <div class="sp"></div>
     <div class="clock"><span id="clk">--:--:--</span><small id="clkDate"></small></div>
+    <div class="cnet" id="cnet"><i></i><span id="cnetText">本机</span></div>
+    <button class="tbtn" id="btnSyncNow">同步云端</button>
     <a class="tbtn" href="./index.html" style="text-decoration:none">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l-5 6 5 6M4 12h14" stroke="currentColor" stroke-width="1.8"/></svg>返回看板
     </a>
@@ -175,7 +181,7 @@ button{font-family:inherit}
           <button class="clr" id="cartClear">清空</button>
         </div>
       </div>
-      <div class="cart-tip">开单后订单存入本浏览器，回到「富掌柜交易看板.html」会自动合并到总览与账单。</div>
+      <div class="cart-tip">开单即写入收银服务并推送云端；手机端 APP 与交易看板刷新后都能看到同一笔。服务未启动时自动存入本浏览器，恢复后会自动补传。</div>
     </aside>
 
     <section class="bill">
@@ -228,6 +234,83 @@ var META = {"shop":"商河县李家大院饭店1","term":"35385391","acct":"mxa7
     el.classList.add('on');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function(){ el.classList.remove('on'); }, 2600);
+  }
+
+  /* ---------- 数据源：收银服务优先 → 云端 json → 本机 ---------- */
+  var SRC = 'local';
+  function setSrc(m){
+    SRC = m;
+    var box = document.getElementById('cnet');
+    box.classList.remove('cloud', 'off');
+    if (m === 'api') { document.getElementById('cnetText').textContent = '收银服务'; }
+    else if (m === 'cloud') { box.classList.add('cloud'); document.getElementById('cnetText').textContent = '云端'; }
+    else { box.classList.add('off'); document.getElementById('cnetText').textContent = '本机'; }
+  }
+  async function fetchRemote(){
+    try {
+      var r = await fetch('./api/orders?_=' + Date.now(), {cache: 'no-store'});
+      if (r.ok) {
+        var j = await r.json();
+        if (j && Array.isArray(j.orders)) { setSrc('api'); return {mode: 'api', orders: j.orders}; }
+      }
+    } catch (e) {}
+    try {
+      var r2 = await fetch('./data/orders.json?_=' + Date.now(), {cache: 'no-store'});
+      if (r2.ok) {
+        var j2 = await r2.json();
+        if (j2 && Array.isArray(j2.orders)) { setSrc('cloud'); return {mode: 'cloud', orders: j2.orders}; }
+      }
+    } catch (e) {}
+    setSrc('local');
+    return {mode: 'local', orders: []};
+  }
+  function mergeIn(list){
+    var seen = {}, out = [];
+    list.concat(ORDERS).forEach(function(o){
+      if (!o || !o.no || seen[o.no]) return;
+      seen[o.no] = 1; out.push(o);
+    });
+    out.sort(function(a, b){ return String(a.time) < String(b.time) ? 1 : -1; });
+    ORDERS = out;
+    saveOrders(); renderBill();
+  }
+
+  async function syncRemote(silent){
+    var res = await fetchRemote();
+    if (res.mode === 'local') {
+      if (!silent && ORDERS.length) toast('未找到收银服务，本机还有 ' + ORDERS.length + ' 笔待传');
+      return;
+    }
+    var remoteNos = {};
+    res.orders.forEach(function(o){ remoteNos[o.no] = 1; });
+    mergeIn(res.orders);
+    // 本机有、远端没有的 → 补传
+    if (res.mode === 'api') {
+      var pend = ORDERS.filter(function(o){ return !remoteNos[o.no]; });
+      for (var i = 0; i < pend.length; i++) {
+        try {
+          await fetch('./api/orders', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({order: pend[i]})});
+        } catch (e) {}
+      }
+      if (pend.length) { await fetchRemote(); mergeIn(res.orders); }
+      if (!silent) toast('已与收银服务同步，共 ' + ORDERS.length + ' 笔');
+    } else if (!silent) {
+      toast('当前为云端只读模式（' + res.orders.length + ' 笔），开单需启动收银服务');
+    }
+  }
+
+  async function syncAll(){
+    if (SRC === 'api') {
+      try {
+        var r = await fetch('./api/sync', {method: 'POST'});
+        var j = await r.json();
+        toast(j.ok ? ('已推送 ' + (j.count || 0) + ' 笔到 GitHub') : ('推送失败：' + (j.error || '检查 sync_config.json 里的 token')));
+      } catch (e) { toast('同步请求失败'); }
+      return;
+    }
+    if (SRC === 'cloud') { toast('电脑端已由收银服务推送，这里无需重复同步'); return; }
+    toast('本机模式：请先启动收银服务（sync_server.py）再同步');
   }
 
   /* ---------- 本地存取 ---------- */
@@ -358,7 +441,7 @@ var META = {"shop":"商河县李家大院饭店1","term":"35385391","acct":"mxa7
     document.getElementById('billStat').innerHTML = '共 <b>' + ORDERS.length + '</b> 笔 · 合计 <b>' + money(sum) + '</b>';
   }
 
-  function submit(){
+  async function submit(){
     var ns = cartNames();
     if (!ns.length) { toast('先选一道菜再开单'); return; }
     var items = [], total = 0;
@@ -376,7 +459,18 @@ var META = {"shop":"商河县李家大院饭店1","term":"35385391","acct":"mxa7
     saveOrders();
     CART = {};
     renderDishes(); renderCart(); renderBill();
-    toast('已开单 ' + no + ' · ' + money(total) + '，回到看板会自动合并');
+    try {
+      var r = await fetch('./api/orders', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({order: order})});
+      if (r.ok) {
+        var j = await r.json();
+        setSrc('api');
+        toast('已开单 ' + no + ' · ' + money(total) +
+              (j.pushed ? '，并已推送云端' : '，已写入收银服务（云端未配 token）'));
+        return;
+      }
+    } catch (e) {}
+    toast('已开单 ' + no + ' · ' + money(total) + '，暂存本机，点「同步云端」可补传');
   }
 
   /* ---------- 导出 ---------- */
@@ -424,14 +518,17 @@ var META = {"shop":"商河县李家大院饭店1","term":"35385391","acct":"mxa7
     if (!cartNames().length) { toast('当前点单已是空的'); return; }
     CART = {}; renderDishes(); renderCart(); toast('已清空当前点单');
   });
-  document.getElementById('billBody').addEventListener('click', function(e){
+  document.getElementById('billBody').addEventListener('click', async function(e){
     var b = e.target.closest('[data-del]');
     if (!b) return;
     var no = b.getAttribute('data-del');
     if (!window.confirm('撤销订单 ' + no + ' ？撤销后看板里也不再计入。')) return;
     ORDERS = ORDERS.filter(function(o){ return o.no !== no; });
-    saveOrders(); renderBill(); toast('已撤销 ' + no);
+    saveOrders(); renderBill();
+    try { await fetch('./api/orders?no=' + encodeURIComponent(no), {method: 'DELETE'}); } catch (e) {}
+    toast('已撤销 ' + no);
   });
+  document.getElementById('btnSyncNow').addEventListener('click', syncAll);
   document.getElementById('btnExportJson').addEventListener('click', exportJson);
   document.getElementById('btnClearAll').addEventListener('click', function(){
     if (!ORDERS.length) { toast('没有点餐记录'); return; }
@@ -459,6 +556,7 @@ var META = {"shop":"商河县李家大院饭店1","term":"35385391","acct":"mxa7
   ORDERS = loadOrders();
   renderChips(); renderDishes(); renderCart(); renderBill();
   if (ORDERS.length) setTimeout(function(){ toast('已载入本机留存的 ' + ORDERS.length + ' 笔点餐单'); }, 500);
+  syncRemote(true);
 })();
 </script>
 </body>

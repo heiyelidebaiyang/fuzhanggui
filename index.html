@@ -321,6 +321,7 @@ td.n,th.n{text-align:right;font-family:var(--num);font-variant-numeric:tabular-n
       <div class="who">
         <div class="row"><span>收银员</span><span class="num" style="color:#EFF3F7">mxa733175</span></div>
         <div class="row"><span>数据截止</span><span class="num" id="updTime">—</span></div>
+        <div class="row"><span>数据来源</span><span class="num" id="srcTag" style="color:#9FC3E8">—</span></div>
         <div class="row"><button class="linklike" id="logout">退出登录</button><span class="num" style="color:#7F8B98">演示版</span></div>
       </div>
     </aside>
@@ -337,11 +338,17 @@ td.n,th.n{text-align:right;font-family:var(--num);font-variant-numeric:tabular-n
           <button data-range="90">近 90 天</button>
           <button data-range="30">近 30 天</button>
         </div>
+        <a class="btn-ghost" href="app.html" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="7" y="3" width="10" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M10 6h4" stroke="currentColor" stroke-width="1.6"/></svg>手机端 APP
+        </a>
         <a class="btn-ghost" href="order-pad.html" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9"/></svg>点餐开单
         </a>
         <button class="btn-ghost" id="btnImportOrders">
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 15V5M7 9l5-5 5 5M5 19h14" stroke="currentColor" stroke-width="1.8"/></svg>导入点餐单
+        </button>
+        <button class="btn-ghost" id="btnPullRemote">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4" stroke="currentColor" stroke-width="1.8"/></svg>刷新数据
         </button>
         <input type="file" id="importOrders" accept=".json,.csv,application/json,text/csv" hidden>
         <button class="btn-ghost" id="btnExportTop">
@@ -1361,10 +1368,34 @@ document.getElementById('btnExportTop').addEventListener('click', function(){
   } catch (e) {}
 })();
 
+/* ========== 远端订单（收银服务 → 云端 → 本机） ========== */
+var SRC_TAG = '本机';
+async function pullRemoteOrders(){
+  try {
+    var r = await fetch('./api/orders?_=' + Date.now(), {cache: 'no-store'});
+    if (r.ok) {
+      var j = await r.json();
+      if (j && Array.isArray(j.orders)) { SRC_TAG = '收银服务'; return j.orders; }
+    }
+  } catch (e) {}
+  try {
+    var r2 = await fetch('./data/orders.json?_=' + Date.now(), {cache: 'no-store'});
+    if (r2.ok) {
+      var j2 = await r2.json();
+      if (j2 && Array.isArray(j2.orders)) { SRC_TAG = '云端'; return j2.orders; }
+    }
+  } catch (e) {}
+  SRC_TAG = '本机';
+  return [];
+}
+
 /* ========== 启动 ========== */
-function boot(){
+async function boot(){
   var extN = 0;
   try { extN = mergeExtraOrders(readExtrasFromStorage()); } catch (e) {}
+  try { extN += mergeExtraOrders(await pullRemoteOrders()); } catch (e) {}
+  var srcEl = document.getElementById('srcTag');
+  if (srcEl) srcEl.textContent = SRC_TAG;
   document.getElementById('updTime').textContent = DATA.meta.update.slice(5,16);
   var fm = document.getElementById('fMonth');
   fm.innerHTML = '<option value="all">全部月份</option>' + DATA.months.map(function(m){
@@ -1373,8 +1404,17 @@ function boot(){
   document.getElementById('fStatus').innerHTML = '<option value="all">全部状态</option><option value="03">已完成（03）</option>';
   renderAbout();
   go((location.hash || '#/overview').replace('#/',''));
-  if (extN) setTimeout(function(){ toast('已自动合并点餐开单页的 ' + extN + ' 笔新单'); }, 600);
+  if (extN) setTimeout(function(){ toast('已合并 ' + extN + ' 笔点餐单（来源：' + SRC_TAG + '）'); }, 600);
 }
+document.getElementById('btnPullRemote').addEventListener('click', async function(){
+  var n = 0;
+  try { n = mergeExtraOrders(await pullRemoteOrders()); } catch (e) {}
+  var srcEl = document.getElementById('srcTag');
+  if (srcEl) srcEl.textContent = SRC_TAG;
+  document.getElementById('updTime').textContent = DATA.meta.update.slice(5,16);
+  refreshAll();
+  toast(n ? ('已拉取 ' + n + ' 笔新单（' + SRC_TAG + '）') : ('没有新单（' + SRC_TAG + '）'));
+});
 window.addEventListener('resize', function(){
   Object.keys(CH).forEach(function(k){ try{ CH[k].resize(); }catch(e){} });
 });
