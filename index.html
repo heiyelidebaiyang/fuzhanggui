@@ -315,9 +315,7 @@ td.n,th.n{text-align:right;font-family:var(--num);font-variant-numeric:tabular-n
         <button class="nav-item" data-route="goods">
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 4l8 4-8 4-8-4zM4 12l8 4 8-4M4 16l8 4 8-4" stroke="currentColor" stroke-width="1.6"/></svg>商品分析
         </button>
-        <button class="nav-item" data-route="about">
-          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v.01M11 12h1v5h1" stroke="currentColor" stroke-width="1.8"/></svg>数据说明
-        </button>
+        
       </nav>
       <div class="who">
         <div class="row"><span>收银员</span><span class="num" style="color:#EFF3F7">mxa733175</span></div>
@@ -533,33 +531,7 @@ td.n,th.n{text-align:right;font-family:var(--num);font-variant-numeric:tabular-n
           </div>
         </section>
 
-        <!-- ===== 视图：数据说明 ===== -->
-        <section class="view" id="view-about">
-          <div class="panel" style="margin-top:0">
-            <div class="panel-hd"><h3>数据来源与口径</h3></div>
-            <div class="panel-bd" style="font-size:13.5px;line-height:1.75;color:var(--ink-2)">
-              <p style="margin-top:0">本看板的全部数字由本地订单库实时计算，不接任何线上接口。</p>
-              <dl class="kv" style="grid-template-columns:110px 1fr">
-                <dt>数据文件</dt><dd style="font-family:var(--ui)">完整订单汇总 CSV · 完整菜品明细 CSV</dd>
-                <dt>订单笔数</dt><dd id="abOrders" style="font-family:var(--ui)">—</dd>
-                <dt>实收合计</dt><dd id="abAmt" style="font-family:var(--ui)">—</dd>
-                <dt>营业区间</dt><dd id="abRange" style="font-family:var(--ui)">—</dd>
-                <dt>真实 / 模拟</dt><dd id="abMix" style="font-family:var(--ui)">—</dd>
-                <dt>订单状态</dt><dd style="font-family:var(--ui)">全部为 03（已完成结账），无挂单与退款单</dd>
-                <dt>支付方式</dt><dd style="font-family:var(--ui)">全部为 CASH（现金结算），因此未做支付构成图</dd>
-                <dt>菜品口径</dt><dd style="font-family:var(--ui)">114 个 SKU，按「套餐 / 酒水 / 饮品 / 主食 / 凉菜 / 热菜 / 烟品 / 餐具服务」归类；单位已把 copy·pan·bottle·wei·tao 等原始写法归一到份·盘·瓶·位·套</dd>
-              </dl>
-              <div class="notes" style="margin-top:4px">
-                <ul>
-                  <li>金额口径统一为「实收金额」，单位为元；菜品明细中的单价与实收保留原始分值换算。</li>
-                  <li>桌台为空白的 306 笔为早期无桌台单，计入营业额但不参与桌台排行。</li>
-                  
-                  <li>点餐开单已拆成独立页面「点餐开单.html」：在那里下单后，订单存进浏览器本地；本看板打开时自动读取并合并，也可用顶部「导入点餐单」按钮手动选它导出的 JSON / CSV。
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
+        
 
       </div>
     </main>
@@ -736,8 +708,7 @@ var ROUTES = {
   overview:{t:'销售总览', c:'经营看板 / 销售总览'},
   orders:{t:'订单列表', c:'经营看板 / 订单列表'},
   bills:{t:'销售账单', c:'经营看板 / 销售账单'},
-  goods:{t:'商品分析', c:'经营看板 / 商品分析'},
-  about:{t:'数据说明', c:'经营看板 / 数据说明'}
+  goods:{t:'商品分析', c:'经营看板 / 商品分析'}
 };
 function go(route){
   if (!ROUTES[route]) route = 'overview';
@@ -1335,6 +1306,7 @@ document.getElementById('importOrders').addEventListener('change', function(e){
 
 /* ========== 数据说明 ========== */
 function renderAbout(){
+  if (!document.getElementById('abOrders')) return;
   document.getElementById('abOrders').textContent = fmtInt(DATA.meta.orders) + ' 笔（菜品明细 ' + fmtInt(DATA.meta.detailRows) + ' 行）';
   document.getElementById('abAmt').textContent = '¥' + fmtMoney(DATA.meta.amount, 2);
   document.getElementById('abRange').textContent = DATA.meta.range[0] + ' ~ ' + DATA.meta.range[1] + '，共 ' + DATA.meta.days + ' 个营业日';
