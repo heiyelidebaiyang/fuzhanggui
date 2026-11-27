@@ -251,7 +251,7 @@ td.n,th.n{text-align:right;font-family:var(--num);font-variant-numeric:tabular-n
         <span class="lg"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 19V9l8-5 8 5v10" stroke="#fff" stroke-width="2.2"/><path d="M9 19v-6h6v6" stroke="#CFE0F8" stroke-width="2.2"/></svg></span>
         富掌柜 · 商户管理平台
       </div>
-      <div class="tag">SaaS 收银 · 演示环境</div>
+      
     </header>
 
     <main class="lp-main">
@@ -285,12 +285,12 @@ td.n,th.n{text-align:right;font-family:var(--num);font-variant-numeric:tabular-n
           </div>
           <div id="gateErr"></div>
           <button class="lp-submit" type="submit">登 录</button>
-          <div class="lp-tip">演示说明：账号已预填，密码与图形验证码按页面提示输入即可进入；本页不展示、不校验任何真实密码。</div>
+          
         </form>
       </div>
     </main>
 
-    <footer class="lp-foot">演示页面 · 数据仅存本机 · 与真实商户云端无连接</footer>
+    
   </div>
 </div>
 
@@ -698,7 +698,7 @@ document.getElementById('eyeBtn').addEventListener('click', function(){
 document.getElementById('forgotBtn').addEventListener('click', function(){
   var err = document.getElementById('gateErr');
   err.style.color = '#1F63C8';
-  err.textContent = '演示环境不提供找回密码，可直接用预填账号进入。';
+  err.textContent = '账号已预填，直接点「登录」即可。';
   setTimeout(function(){ err.style.color = ''; err.textContent = ''; }, 3200);
 });
 document.getElementById('loginForm').addEventListener('submit', function(e){
